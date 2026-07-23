@@ -33,14 +33,8 @@
   }
   header.hero h1{
     font-size:clamp(28px,4vw,42px);
-    margin:0 0 12px;
+    margin:0 0 24px;
     letter-spacing:-0.02em;
-  }
-  header.hero p{
-    color:var(--text-dim);
-    max-width:560px;
-    margin:0 auto;
-    font-size:16px;
   }
   header.hero .badge{
     display:inline-block;
@@ -53,6 +47,35 @@
     font-weight:600;
     letter-spacing:.02em;
     margin-bottom:18px;
+  }
+
+  .hero-explainer{
+    max-width:600px;
+    margin:0 auto;
+    text-align:left;
+    background:var(--bg-card);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:24px 28px;
+  }
+  .hero-explainer h2{
+    margin:0 0 14px;
+    font-size:18px;
+    color:var(--accent);
+  }
+  .hero-explainer p{
+    color:var(--text-dim);
+    font-size:14.5px;
+    margin:0 0 12px;
+  }
+  .hero-explainer p:last-child{margin-bottom:0}
+  .hero-explainer .hero-emphasis{
+    color:var(--text);
+    font-weight:600;
+    font-size:15.5px;
+    border-left:3px solid var(--accent);
+    padding-left:14px;
+    margin:16px 0;
   }
 
   .progress-wrap{
@@ -368,7 +391,14 @@
 <header class="hero">
   <span class="badge">PRD BUILDER</span>
   <h1>Construye un PRD de clase mundial</h1>
-  <p>Responde estas 10 categorías de preguntas — el mínimo que cualquier equipo (humano o de agentes de IA) necesita para empezar a construir sin adivinar. Al final descargas tu <code>PRD.md</code>.</p>
+  <div class="hero-explainer">
+    <h2>¿Qué es un PRD?</h2>
+    <p>El PRD (Product Requirements Document) es el documento que define qué vas a construir, para quién y por qué, antes de escribir una sola línea de código.</p>
+    <p>Es importante porque pone a todo el equipo (ahora también a los agentes de IA) de acuerdo sobre el mismo objetivo y evita construir cosas no planeadas.</p>
+    <p>A diferencia de un PRD tradicional, que está pensado para que un humano implemente el producto, uno para IA está pensado para que un agente pueda razonar, decidir y generar código consistente durante semanas.</p>
+    <p class="hero-emphasis">No es una especificación.<br>Es el contexto permanente del proyecto.</p>
+    <p>El objetivo de un PRD no es describir cada pantalla ni cada botón, sino darle al agente suficiente contexto para tomar decisiones correctas incluso cuando el usuario no está presente. La implementación, la arquitectura y la UI pueden evolucionar — el PRD debe ser estable en el tiempo.</p>
+  </div>
 </header>
 
 <div class="progress-wrap">
@@ -392,7 +422,7 @@
     <button id="downloadBtn" type="button" disabled>Descargar PRD.md</button>
     <button id="resetBtn" type="button">Reiniciar</button>
   </div>
-  <p class="hint" id="hintText">Tus respuestas se guardan automáticamente en este navegador. El botón se activa cuando completas el nombre del producto y TODAS las preguntas.</p>
+  <p class="hint" id="hintText">Tus respuestas se guardan automáticamente en este navegador. El botón se activa cuando completas el nombre del producto y TODAS las preguntas. Al descargar, el formulario se reinicia.</p>
 
 </main>
 
@@ -803,7 +833,18 @@
   function showToast(msg){
     toast.textContent = msg;
     toast.classList.add("show");
-    setTimeout(function(){ toast.classList.remove("show"); }, 2200);
+    setTimeout(function(){ toast.classList.remove("show"); }, 2400);
+  }
+
+  function clearForm(){
+    productNameEl.value = "";
+    allTextareas.forEach(function(t){ t.value = ""; });
+    try { localStorage.removeItem(STORAGE_KEY); } catch(e){}
+    updateProgress();
+    // colapsar todo menos la primera categoría, como al iniciar de cero
+    document.querySelectorAll("section.category").forEach(function(section, i){
+      section.classList.toggle("open", i === 0);
+    });
   }
 
   function downloadMarkdown(){
@@ -817,7 +858,10 @@
     a.click();
     document.body.removeChild(a);
     setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
-    showToast("PRD.md descargado ✓");
+
+    // tras descargar, el formulario se reinicia (los datos ya viven en el PRD.md descargado)
+    clearForm();
+    showToast("PRD.md descargado ✓ · formulario reiniciado");
   }
 
   // ---- Events ----
@@ -846,10 +890,7 @@
 
   resetBtn.addEventListener("click", function(){
     if (!confirm("¿Borrar todas las respuestas? Esta acción no se puede deshacer.")) return;
-    productNameEl.value = "";
-    allTextareas.forEach(function(t){ t.value = ""; });
-    try { localStorage.removeItem(STORAGE_KEY); } catch(e){}
-    updateProgress();
+    clearForm();
   });
 
   // ---- Init ----
