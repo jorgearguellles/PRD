@@ -90,6 +90,14 @@
     white-space:nowrap;
     font-variant-numeric:tabular-nums;
   }
+  .save-indicator{
+    font-size:11px;
+    color:var(--accent);
+    opacity:0;
+    transition:opacity .3s;
+    white-space:nowrap;
+  }
+  .save-indicator.show{opacity:1}
 
   main{
     max-width:var(--max-w);
@@ -165,6 +173,20 @@
     font-weight:400;
     margin-top:2px;
   }
+  section.category .cat-count{
+    font-size:11px;
+    color:var(--text-dim);
+    font-weight:600;
+    flex:0 0 auto;
+    background:var(--border);
+    padding:3px 8px;
+    border-radius:999px;
+    font-variant-numeric:tabular-nums;
+  }
+  section.category.complete .cat-count{
+    background:var(--accent);
+    color:#04231a;
+  }
   section.category .chevron{
     color:var(--text-dim);
     transition:transform .2s;
@@ -179,19 +201,81 @@
     padding:0 20px;
   }
   section.category.open .cat-body{
-    max-height:3000px;
+    max-height:4000px;
     padding:0 20px 20px;
   }
 
-  .q-block{margin-bottom:16px}
+  .q-block{margin-bottom:18px}
   .q-block:last-child{margin-bottom:0}
-  .q-block label{
-    display:block;
+
+  .q-label-wrap{
+    position:relative;
+    display:inline-flex;
+    align-items:flex-start;
+    gap:6px;
+    margin-bottom:6px;
+  }
+  .q-label-wrap label{
     font-size:14px;
     font-weight:500;
-    margin-bottom:6px;
     color:var(--text);
+    cursor:default;
   }
+  .info-icon{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    width:16px;
+    height:16px;
+    border-radius:50%;
+    background:var(--border);
+    color:var(--text-dim);
+    font-size:11px;
+    font-style:normal;
+    font-weight:700;
+    cursor:help;
+    flex:0 0 auto;
+    margin-top:1px;
+  }
+  .info-icon:hover,.info-icon:focus{
+    background:var(--accent);
+    color:#04231a;
+    outline:none;
+  }
+  .info-tooltip{
+    position:absolute;
+    top:100%;
+    left:0;
+    margin-top:8px;
+    width:min(320px,80vw);
+    background:#1c2128;
+    border:1px solid var(--accent-dark);
+    color:var(--text);
+    font-size:12.5px;
+    line-height:1.55;
+    padding:12px 14px;
+    border-radius:8px;
+    box-shadow:0 8px 24px rgba(0,0,0,.45);
+    z-index:20;
+    opacity:0;
+    visibility:hidden;
+    transform:translateY(-4px);
+    transition:opacity .15s,transform .15s;
+    pointer-events:none;
+  }
+  .info-tooltip .tt-example{
+    display:block;
+    margin-top:8px;
+    color:var(--accent);
+    font-style:italic;
+  }
+  .q-label-wrap:hover .info-tooltip,
+  .info-icon:focus + .info-tooltip{
+    opacity:1;
+    visibility:visible;
+    transform:translateY(0);
+  }
+
   .q-block textarea{
     width:100%;
     min-height:70px;
@@ -291,6 +375,7 @@
   <div class="progress-inner">
     <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
     <span class="progress-label" id="progressLabel">0% completado</span>
+    <span class="save-indicator" id="saveIndicator">Guardado ✓</span>
   </div>
 </div>
 
@@ -307,7 +392,7 @@
     <button id="downloadBtn" type="button" disabled>Descargar PRD.md</button>
     <button id="resetBtn" type="button">Reiniciar</button>
   </div>
-  <p class="hint">Tus respuestas se guardan automáticamente en este navegador. El botón se activa cuando completas el nombre del producto y al menos una pregunta por categoría.</p>
+  <p class="hint" id="hintText">Tus respuestas se guardan automáticamente en este navegador. El botón se activa cuando completas el nombre del producto y TODAS las preguntas.</p>
 
 </main>
 
@@ -319,95 +404,216 @@
 (function(){
   "use strict";
 
+  // Cada pregunta tiene: text (la pregunta) y help (tooltip: explicación + ejemplo)
   var CATEGORIES = [
     {
       title: "Problema y objetivo",
       sub: "Qué dolor resuelve y cómo se mide el éxito",
       questions: [
-        "¿Qué dolor o fricción existe hoy que este producto resuelve?",
-        "¿Quién sufre este problema y cómo lo resuelve actualmente (workaround, otra herramienta, o nada)?",
-        "¿Cómo sabrás que el problema está resuelto? Define una métrica concreta, no una sensación (\"que se vea bien\" no cuenta).",
-        "¿Por qué ahora? ¿Qué cambió que hace de este el momento correcto para construirlo?"
+        {
+          text: "¿Qué dolor o fricción existe hoy que este producto resuelve?",
+          help: "Describe el problema que la gente tiene HOY, antes de que exista tu producto. No describas tu solución, describe el dolor.",
+          example: "Los usuarios pierden 20 minutos diarios buscando qué eventos hay esta semana porque la info está repartida en 5 páginas distintas."
+        },
+        {
+          text: "¿Quién sufre este problema y cómo lo resuelve actualmente (workaround, otra herramienta, o nada)?",
+          help: "Nombra quién sufre el problema y qué hace hoy para resolverlo, aunque sea una solución mala o manual.",
+          example: "Personas de 25-45 años que buscan planes; hoy revisan el Instagram de cada venue uno por uno."
+        },
+        {
+          text: "¿Cómo sabrás que el problema está resuelto? Define una métrica concreta, no una sensación (\"que se vea bien\" no cuenta).",
+          help: "Un número medible que puedas trackear, no una opinión subjetiva.",
+          example: "% de usuarios que hacen click en \"comprar entrada\" desde la agenda en su primera visita."
+        },
+        {
+          text: "¿Por qué ahora? ¿Qué cambió que hace de este el momento correcto para construirlo?",
+          help: "Qué cambió en el mercado, la tecnología o el comportamiento del usuario que hace que este sea el momento.",
+          example: "Post-pandemia la demanda de planes presenciales creció, pero no hay un agregador local confiable."
+        }
       ]
     },
     {
       title: "Usuarios y casos de uso",
       sub: "Perfiles concretos y jobs-to-be-done",
       questions: [
-        "Describe 1-3 perfiles de usuario concretos (rol, contexto, nivel técnico). Evita \"todo el mundo\".",
-        "Para cada perfil, ¿qué \"trabajo\" (job-to-be-done) viene a hacer con el producto?",
-        "¿Qué les frustra hoy de las alternativas que usan actualmente?"
+        {
+          text: "Describe 1-3 perfiles de usuario concretos (rol, contexto, nivel técnico). Evita \"todo el mundo\".",
+          help: "Da rol, contexto de uso y nivel técnico. Entre más específico, mejor decides features después.",
+          example: "Ana, 28 años, freelancer, revisa el celular los viernes para planear su fin de semana; no técnica."
+        },
+        {
+          text: "Para cada perfil, ¿qué \"trabajo\" (job-to-be-done) viene a hacer con el producto?",
+          help: "Completa la frase: \"Cuando ___, quiero ___, para ___\".",
+          example: "Cuando es viernes, quiero ver qué hay esta semana cerca de mí, para decidir un plan sin buscar en 5 apps."
+        },
+        {
+          text: "¿Qué les frustra hoy de las alternativas que usan actualmente?",
+          help: "Sé específico sobre la limitación de cada alternativa, no solo \"son malas\".",
+          example: "Instagram no permite filtrar por fecha ni categoría; Eventbrite solo muestra eventos con boletería propia."
+        }
       ]
     },
     {
       title: "Alcance (in / out)",
       sub: "Qué entra en esta versión y qué explícitamente no",
       questions: [
-        "¿Qué SÍ entra en esta primera versión?",
-        "¿Qué NO entra, aunque parezca fácil o tentador de agregar?",
-        "¿Qué restricción de tiempo o presupuesto está definiendo este alcance?"
+        {
+          text: "¿Qué SÍ entra en esta primera versión?",
+          help: "Lista concreta de funciones, no un objetivo vago.",
+          example: "Ver agenda semanal, filtrar por disciplina, ver el detalle de cada evento."
+        },
+        {
+          text: "¿Qué NO entra, aunque parezca fácil o tentador de agregar?",
+          help: "Sé explícito aunque suene obvio — esto es lo que más previene que el proyecto se infle.",
+          example: "No habrá compra de entradas dentro de la app, solo un enlace externo al organizador."
+        },
+        {
+          text: "¿Qué restricción de tiempo o presupuesto está definiendo este alcance?",
+          help: "El alcance real siempre lo define el recurso más escaso: tiempo, dinero o gente.",
+          example: "MVP en 3 semanas con un solo developer, $0 de presupuesto de infraestructura."
+        }
       ]
     },
     {
       title: "Funcionalidades (MoSCoW)",
       sub: "Priorizadas: must / should / could / won't",
       questions: [
-        "Must have — ¿sin qué el producto no tiene sentido lanzarlo?",
-        "Should have — ¿qué es importante pero no bloquea el lanzamiento?",
-        "Could have — ¿qué sería un plus si sobra tiempo?",
-        "Won't have (por ahora) — ¿qué queda descartado explícitamente para esta versión?"
+        {
+          text: "Must have — ¿sin qué el producto no tiene sentido lanzarlo?",
+          help: "Si falta esto, no hay producto. Sé austero: no todo cabe aquí.",
+          example: "Ver la lista de eventos de la semana actual."
+        },
+        {
+          text: "Should have — ¿qué es importante pero no bloquea el lanzamiento?",
+          help: "Mejora la experiencia pero el producto funciona sin ello el día 1.",
+          example: "Filtrar eventos por categoría o disciplina."
+        },
+        {
+          text: "Could have — ¿qué sería un plus si sobra tiempo?",
+          help: "Nice-to-have real: si no llega a tiempo, no pasa nada.",
+          example: "Guardar eventos como favoritos."
+        },
+        {
+          text: "Won't have (por ahora) — ¿qué queda descartado explícitamente para esta versión?",
+          help: "Decisiones que ya tomaste de NO construir, para que nadie las de por sentado.",
+          example: "Sistema de reservas propio, login de usuarios, notificaciones push."
+        }
       ]
     },
     {
       title: "Modelo de datos / contenido",
       sub: "Entidades, campos y origen de los datos",
       questions: [
-        "¿Qué entidades principales maneja el producto? (ej. usuario, tarea, pedido)",
-        "Para la entidad más importante, ¿qué campos o atributos tiene?",
-        "¿De dónde vienen los datos? (formulario manual, API externa, scraping, importación, generado por IA)"
+        {
+          text: "¿Qué entidades principales maneja el producto? (ej. usuario, tarea, pedido)",
+          help: "Una ENTIDAD es un tipo de objeto sobre el que guardas información — se vuelve una tabla en la base de datos (cada instancia es una fila). Pregúntate: \"¿de qué necesito una lista?\"",
+          example: "En una agenda de eventos: Evento, Lugar, Categoría, Sesión, Artista."
+        },
+        {
+          text: "Para la entidad más importante, ¿qué campos o atributos tiene?",
+          help: "Un ATRIBUTO es un dato específico de esa entidad — se vuelve una columna de la tabla.",
+          example: "La entidad Evento tiene: título, descripción, fecha_inicio, lugar, imagen, precio."
+        },
+        {
+          text: "¿De dónde vienen los datos? (formulario manual, API externa, scraping, importación, generado por IA)",
+          help: "¿Quién los escribe y cómo llegan al sistema? No hay respuesta incorrecta, pero debe ser explícita porque cambia todo el diseño técnico.",
+          example: "Un administrador los carga manualmente cada semana en un panel/formulario."
+        }
       ]
     },
     {
       title: "Flujos clave",
       sub: "Los 2-3 recorridos de usuario que más importan",
       questions: [
-        "Flujo 1 — describe paso a paso el recorrido más importante del usuario.",
-        "Flujo 2 — describe otro recorrido crítico (puede ser de error, cancelación o un caso límite).",
-        "Flujo 3 (opcional) — ¿hay un tercer recorrido relevante que valga la pena documentar?"
+        {
+          text: "Flujo 1 — describe paso a paso el recorrido más importante del usuario.",
+          help: "El camino feliz: desde que el usuario llega hasta que logra su objetivo, paso por paso.",
+          example: "Abre la web → ve la agenda de la semana → filtra por música → click en un evento → ve detalle → click en \"comprar\" (va a página externa)."
+        },
+        {
+          text: "Flujo 2 — describe otro recorrido crítico (puede ser de error, cancelación o un caso límite).",
+          help: "Qué pasa cuando algo no sale como se espera.",
+          example: "Usuario busca una semana sin eventos → ve un estado vacío con sugerencia de otra fecha."
+        },
+        {
+          text: "Flujo 3 (opcional) — ¿hay un tercer recorrido relevante que valga la pena documentar?",
+          help: "Solo si aplica; no fuerces un tercer flujo si no existe.",
+          example: "Un organizador solicita agregar su evento a la agenda vía un formulario público."
+        }
       ]
     },
     {
       title: "Restricciones técnicas y de negocio",
       sub: "Presupuesto, stack, integraciones, cumplimiento legal",
       questions: [
-        "¿Hay stack, hosting o integraciones obligatorias?",
-        "¿Hay restricciones de presupuesto o tiempo de entrega?",
-        "¿Aplica algún requisito legal o de cumplimiento? (datos personales, pagos, edad mínima, etc.)"
+        {
+          text: "¿Hay stack, hosting o integraciones obligatorias?",
+          help: "Cualquier cosa que ya esté decidida y no sea negociable.",
+          example: "Debe ser un sitio estático en GitHub Pages, sin backend propio; usar Supabase para los datos."
+        },
+        {
+          text: "¿Hay restricciones de presupuesto o tiempo de entrega?",
+          help: "Números concretos, no \"lo antes posible\".",
+          example: "$0 de presupuesto de infraestructura, lanzamiento en 2 semanas."
+        },
+        {
+          text: "¿Aplica algún requisito legal o de cumplimiento? (datos personales, pagos, edad mínima, etc.)",
+          help: "Piensa en privacidad, datos de menores, procesamiento de pagos.",
+          example: "Si guardas emails de usuarios, necesitas política de privacidad y opción de darse de baja."
+        }
       ]
     },
     {
       title: "Criterios de aceptación",
       sub: "Cómo sabés que cada feature está terminada y correcta",
       questions: [
-        "Para la feature más importante, ¿cómo defines \"terminada y correcta\"? (formato Given/When/Then si aplica)",
-        "¿Qué pruebas o validaciones debe pasar antes de considerarse lista para producción?"
+        {
+          text: "Para la feature más importante, ¿cómo defines \"terminada y correcta\"? (formato Given/When/Then si aplica)",
+          help: "Formato recomendado: Dado [contexto], cuando [acción], entonces [resultado esperado].",
+          example: "Dado un usuario en la agenda, cuando filtra por \"danza\", entonces solo ve eventos de esa categoría."
+        },
+        {
+          text: "¿Qué pruebas o validaciones debe pasar antes de considerarse lista para producción?",
+          help: "Piensa en performance, casos límite y validaciones de datos.",
+          example: "La lista de eventos carga en menos de 2s en móvil; el filtro no rompe si no hay resultados."
+        }
       ]
     },
     {
       title: "No-objetivos / riesgos conocidos",
       sub: "Qué decidiste no resolver y qué podría salir mal",
       questions: [
-        "¿Qué decidiste explícitamente NO resolver en este producto, y por qué?",
-        "¿Qué podría salir mal? (riesgo técnico, de adopción, de negocio, legal)"
+        {
+          text: "¿Qué decidiste explícitamente NO resolver en este producto, y por qué?",
+          help: "Diferente del \"alcance\": aquí es sobre problemas reales que decides ignorar a propósito.",
+          example: "No vamos a resolver la venta de entradas ni el pago, solo redirigir al organizador."
+        },
+        {
+          text: "¿Qué podría salir mal? (riesgo técnico, de adopción, de negocio, legal)",
+          help: "Nombra el riesgo más probable o más caro, no una lista genérica.",
+          example: "Que los organizadores no actualicen su info a tiempo y la agenda quede desactualizada."
+        }
       ]
     },
     {
       title: "Métricas de éxito post-launch",
       sub: "Qué vas a mirar en la primera semana / mes",
       questions: [
-        "¿Qué mirarás en la primera semana para saber si el producto funcionó?",
-        "¿Qué mirarás al primer mes?",
-        "¿Cuál es el número o umbral concreto que definiría éxito vs. fracaso?"
+        {
+          text: "¿Qué mirarás en la primera semana para saber si el producto funcionó?",
+          help: "Métricas tempranas de tracción, no de negocio maduro.",
+          example: "Visitas únicas, clicks en \"comprar entrada\"."
+        },
+        {
+          text: "¿Qué mirarás al primer mes?",
+          help: "Métricas de retención o recurrencia.",
+          example: "% de usuarios que vuelven a entrar una segunda semana."
+        },
+        {
+          text: "¿Cuál es el número o umbral concreto que definiría éxito vs. fracaso?",
+          help: "Un número que, si no se alcanza, te haría replantear el producto.",
+          example: "Si menos del 10% de visitantes hace click en un evento en el primer mes, replantear la propuesta de valor."
+        }
       ]
     }
   ];
@@ -419,6 +625,7 @@
   var resetBtn = document.getElementById("resetBtn");
   var progressFill = document.getElementById("progressFill");
   var progressLabel = document.getElementById("progressLabel");
+  var saveIndicator = document.getElementById("saveIndicator");
   var toast = document.getElementById("toast");
 
   // ---- Build DOM ----
@@ -434,8 +641,9 @@
       '<div class="cat-num">' + (ci + 1) + '</div>' +
       '<div class="cat-title">' + cat.title +
         '<span class="cat-sub">' + cat.sub + '</span></div>' +
+      '<div class="cat-count" data-count-for="' + ci + '">0/' + cat.questions.length + '</div>' +
       '<div class="chevron">▾</div>';
-    header.addEventListener("click", function(){
+    header.addEventListener("click", function(e){
       section.classList.toggle("open");
     });
 
@@ -446,15 +654,37 @@
       var block = document.createElement("div");
       block.className = "q-block";
       var id = "q_" + ci + "_" + qi;
+
+      var labelWrap = document.createElement("div");
+      labelWrap.className = "q-label-wrap";
+
       var label = document.createElement("label");
       label.setAttribute("for", id);
-      label.textContent = q;
+      label.textContent = q.text;
+
+      var icon = document.createElement("span");
+      icon.className = "info-icon";
+      icon.textContent = "?";
+      icon.setAttribute("tabindex", "0");
+      icon.setAttribute("role", "button");
+      icon.setAttribute("aria-label", "Ver ayuda para esta pregunta");
+
+      var tooltip = document.createElement("div");
+      tooltip.className = "info-tooltip";
+      tooltip.innerHTML = (q.help || "") +
+        (q.example ? '<span class="tt-example">Ejemplo: ' + q.example + '</span>' : "");
+
+      labelWrap.appendChild(label);
+      labelWrap.appendChild(icon);
+      labelWrap.appendChild(tooltip);
+
       var textarea = document.createElement("textarea");
       textarea.id = id;
       textarea.dataset.cat = ci;
       textarea.dataset.q = qi;
       textarea.placeholder = "Tu respuesta…";
-      block.appendChild(label);
+
+      block.appendChild(labelWrap);
       block.appendChild(textarea);
       body.appendChild(block);
     });
@@ -465,12 +695,25 @@
   });
 
   var allTextareas = Array.prototype.slice.call(formEl.querySelectorAll("textarea"));
+  var TOTAL_QUESTIONS = allTextareas.length;
 
   // ---- Persistence ----
-  function saveState(){
+  var saveIndicatorTimeout = null;
+  function flashSaveIndicator(){
+    saveIndicator.classList.add("show");
+    clearTimeout(saveIndicatorTimeout);
+    saveIndicatorTimeout = setTimeout(function(){
+      saveIndicator.classList.remove("show");
+    }, 1400);
+  }
+
+  function saveState(showIndicator){
     var data = { productName: productNameEl.value, answers: {} };
     allTextareas.forEach(function(t){ data.answers[t.id] = t.value; });
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch(e){}
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      if (showIndicator) flashSaveIndicator();
+    } catch(e){}
   }
 
   function loadState(){
@@ -486,28 +729,39 @@
     } catch(e){}
   }
 
-  // ---- Progress + completion state ----
+  // debounce para no escribir en cada tecla, pero SIEMPRE se guarda al salir de la pregunta (blur)
+  var debounceTimer = null;
+  function debouncedSave(){
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(function(){ saveState(false); }, 400);
+  }
+
+  // ---- Progress (por pregunta respondida, no por categoría) + estado de completitud ----
   function updateProgress(){
-    var totalCats = CATEGORIES.length;
-    var completeCats = 0;
+    var answeredTotal = 0;
 
     document.querySelectorAll("section.category").forEach(function(section){
       var idx = section.dataset.index;
       var textareas = section.querySelectorAll("textarea");
-      var answered = Array.prototype.filter.call(textareas, function(t){
+      var answeredInCat = Array.prototype.filter.call(textareas, function(t){
         return t.value.trim().length > 0;
       }).length;
-      var isComplete = answered > 0;
+      answeredTotal += answeredInCat;
+
+      var isComplete = answeredInCat === textareas.length;
       section.classList.toggle("complete", isComplete);
-      if (isComplete) completeCats++;
+
+      var countEl = section.querySelector('.cat-count[data-count-for="' + idx + '"]');
+      if (countEl) countEl.textContent = answeredInCat + "/" + textareas.length;
     });
 
-    var pct = Math.round((completeCats / totalCats) * 100);
+    var pct = Math.round((answeredTotal / TOTAL_QUESTIONS) * 100);
     progressFill.style.width = pct + "%";
-    progressLabel.textContent = pct + "% completado";
+    progressLabel.textContent = pct + "% completado (" + answeredTotal + "/" + TOTAL_QUESTIONS + ")";
 
     var hasName = productNameEl.value.trim().length > 0;
-    downloadBtn.disabled = !(hasName && completeCats > 0);
+    var allAnswered = answeredTotal === TOTAL_QUESTIONS;
+    downloadBtn.disabled = !(hasName && allAnswered);
   }
 
   // ---- Markdown generation ----
@@ -531,7 +785,7 @@
       cat.questions.forEach(function(q, qi){
         var el = document.getElementById("q_" + ci + "_" + qi);
         var answer = escapeMd(el ? el.value : "");
-        lines.push("**" + q + "**");
+        lines.push("**" + q.text + "**");
         lines.push("");
         lines.push(answer.length ? answer : "_(sin responder)_");
         lines.push("");
@@ -544,14 +798,6 @@
     lines.push("");
 
     return lines.join("\n");
-  }
-
-  function slugify(text){
-    return text
-      .toLowerCase()
-      .normalize("NFD").replace(/[̀-ͯ]/g, "")
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)/g, "") || "producto";
   }
 
   function showToast(msg){
@@ -575,8 +821,23 @@
   }
 
   // ---- Events ----
-  formEl.addEventListener("input", function(){ updateProgress(); saveState(); });
-  productNameEl.addEventListener("input", function(){ updateProgress(); saveState(); });
+  // Guardado inmediato (con indicador visual) al salir de cualquier pregunta (blur/focusout),
+  // y guardado silencioso con debounce mientras se escribe, para no perder nada si cierran la ventana.
+  formEl.addEventListener("input", function(){ updateProgress(); debouncedSave(); });
+  formEl.addEventListener("focusout", function(e){
+    if (e.target && e.target.tagName === "TEXTAREA") {
+      clearTimeout(debounceTimer);
+      saveState(true);
+    }
+  });
+  productNameEl.addEventListener("input", function(){ updateProgress(); debouncedSave(); });
+  productNameEl.addEventListener("blur", function(){
+    clearTimeout(debounceTimer);
+    saveState(true);
+  });
+
+  // red de seguridad: si cierran/recargan la pestaña, forzar guardado inmediato
+  window.addEventListener("beforeunload", function(){ saveState(false); });
 
   downloadBtn.addEventListener("click", function(){
     if (downloadBtn.disabled) return;
